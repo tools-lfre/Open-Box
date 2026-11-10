@@ -101,7 +101,11 @@ test('online install selects the architecture, checks SHA256 and loads the relea
   const h = setup(t, { arch:'arm64', offline:false })
   success(h.run(['--ip','192.168.1.2','--driver','ipvlan']))
   assert.equal(h.state().containers['open-box'].image, 'open-box:0.1.325')
-  assert.ok(h.state().calls.some(c => c[0] === 'curl' && c.some(a => a.endsWith('/open-box-v0.1.325-docker-linux-arm64.tar.gz'))))
+  // Current releases use open-box-docker-<ver>-linux-<arch>.tar.gz; the installer
+  // still falls back to the legacy open-box-<tag>-docker-linux-<arch>.tar.gz name.
+  assert.ok(h.state().calls.some(c => c[0] === 'curl' && c.some(a =>
+    a.endsWith('/open-box-docker-0.1.325-linux-arm64.tar.gz') ||
+    a.endsWith('/open-box-v0.1.325-docker-linux-arm64.tar.gz'))))
   assert.ok(h.state().calls.some(c => c[0] === 'sha256sum'))
   assert.equal(h.state().networks['open-box-lan'].driver, 'ipvlan')
 })
