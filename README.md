@@ -9,7 +9,7 @@ Open-Box 分两部分：**路由器端**装在路由器 / 主机上，是一体�
 
 ## 本仓库是备份镜像（先看这里）
 
-本仓库 `tools-lfre/Open-Box` 是 [liandu2024/Open-Box](https://github.com/liandu2024/Open-Box) 的完整备份镜像，用于原仓库不可访问时继续安装、升级与回滚。**README 与所有脚本中的安装、升级、卸载、Release 下载地址均已指向本仓库**，一键安装不再依赖上游。
+本仓库 `tools-lfre/Open-Box` 是 [liandu2024/Open-Box](https://github.com/liandu2024/Open-Box) 的备份镜像（完整代码提交历史 + 最新正式版 `v0.1.423` Release），用于原仓库不可访问时继续安装与升级。**README 与所有脚本中的安装、升级、卸载、Release 下载地址均已指向本仓库**，一键安装不再依赖上游。
 
 **署名与许可**
 
