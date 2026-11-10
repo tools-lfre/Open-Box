@@ -17,7 +17,7 @@ Open-Box 分两部分：**路由器端**装在路由器 / 主机上，是一体�
 - [LICENSE](LICENSE)、[COPYRIGHT.md](COPYRIGHT.md)、[PRIVACY.md](PRIVACY.md) 与上游逐字节一致，未作任何改动。LICENSE 第 4 条 / 中文说明明确「不覆盖 GitHub 服务条款所必需的仓库查看和 fork 权利」；本镜像仅作个人备份与自用部署。
 - 官方发行版二进制包按**原样镜像**，既不改动也不重新打包（保证 SHA256 可校验，同时符合 LICENSE 第 3 条）。因此已安装实例里面板自带的「检查更新」以及 `open-box check` 仍指向上游；**升级请使用下面的 `update.sh` 命令**。不要手工改写 `/opt/open-box` 下的面板文件——`hardening-manifest.json` 会做完整性校验。
 - README 的 Star 增长图仍统计原仓库以保留原项目历史数据；`docs/release-*.md` 是历史发布验证记录，保留原始链接以维持记录真实性。实际使用一律以本节的命令为准。
-- 已镜像的 Release：`v0.1.423`（最新正式版，含完整安装包、组件包、Docker 镜像包、安装/升级脚本及全部 SHA256 校验文件）。历史版本未镜像，`--rollback` 回退需要历史 Release，请勿依赖。
+- 已镜像的 Release：`v0.1.423`（最新正式版，含完整安装包、组件包、Docker 镜像包、安装/升级脚本及全部 SHA256 校验文件）。历史版本与 Android / macOS / Windows / Linux 客户端安装包未镜像：下文的客户端下载链接、`--rollback` 回退在本镜像中不可用，需要时请自行补齐对应 Release。
 
 ### 安装（本仓库地址）
 
