@@ -7,6 +7,79 @@ Open-Box 分两部分：**路由器端**装在路由器 / 主机上，是一体�
 
 **Open-Box 自有程序为闭源专有软件，并非开源项目。未经许可禁止复制传播自有代码、再分发、反编译及绕过授权。** 正常安装、离线使用、升级、备份和恢复允许；第三方开源组件保留原许可。详见 [LICENSE](LICENSE) 和 [版权范围](COPYRIGHT.md)。
 
+## 本仓库是备份镜像（先看这里）
+
+本仓库 `tools-lfre/Open-Box` 是 [liandu2024/Open-Box](https://github.com/liandu2024/Open-Box) 的完整备份镜像，用于原仓库不可访问时继续安装、升级与回滚。**README 与所有脚本中的安装、升级、卸载、Release 下载地址均已指向本仓库**，一键安装不再依赖上游。
+
+**署名与许可**
+
+- 原作者、版权归 **Open-Box authors**（原仓库所有者 `liandu2024`）所有；本镜像不主张任何代码、商标或衍生发行权利。完整 Git 提交历史（含原始作者信息）原样保留。
+- [LICENSE](LICENSE)、[COPYRIGHT.md](COPYRIGHT.md)、[PRIVACY.md](PRIVACY.md) 与上游逐字节一致，未作任何改动。LICENSE 第 4 条 / 中文说明明确「不覆盖 GitHub 服务条款所必需的仓库查看和 fork 权利」；本镜像仅作个人备份与自用部署。
+- 官方发行版二进制包按**原样镜像**，既不改动也不重新打包（保证 SHA256 可校验，同时符合 LICENSE 第 3 条）。因此已安装实例里面板自带的「检查更新」以及 `open-box check` 仍指向上游；**升级请使用下面的 `update.sh` 命令**。不要手工改写 `/opt/open-box` 下的面板文件——`hardening-manifest.json` 会做完整性校验。
+- README 的 Star 增长图仍统计原仓库以保留原项目历史数据；`docs/release-*.md` 是历史发布验证记录，保留原始链接以维持记录真实性。实际使用一律以本节的命令为准。
+- 已镜像的 Release：`v0.1.423`（最新正式版，含完整安装包、组件包、Docker 镜像包、安装/升级脚本及全部 SHA256 校验文件）。历史版本未镜像，`--rollback` 回退需要历史 Release，请勿依赖。
+
+### 安装（本仓库地址）
+
+以 root 登录路由器 / 主机后执行（OpenWrt、Debian / Ubuntu 由脚本自动识别；安装要求见[安装](#安装)一节）：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/install.sh | sh
+```
+
+GitHub 访问不畅时，用 raw 镜像取脚本，并让脚本走镜像下载发布包：
+
+```sh
+curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/install.sh | sh -s -- --mirror
+```
+
+安装中会让填一次面板端口（默认 **3036**），装完用浏览器打开 `http://<设备 LAN IP>:3036` 并**首次设置管理密码**。
+
+### 升级与卸载
+
+```sh
+# 升级（保留订阅、规则、面板密码）
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/update.sh | sh
+
+# 卸载（默认保留订阅和配置数据）
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/uninstall.sh | sh
+
+# 连数据一起删除
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/uninstall.sh | sh -s -- --purge
+```
+
+### Docker 旁路由
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/docker/install.sh -o /tmp/openbox-docker-install.sh
+sudo sh /tmp/openbox-docker-install.sh --ip 192.168.1.2
+```
+
+详见 [Docker 部署说明](docker/README.md)。脚本会自动从本仓库 Release 取对应架构的镜像包并校验 SHA256。
+
+### 验证安装成功
+
+```sh
+# 1) 脚本可达，且仓库常量指向本镜像
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/install.sh | grep -m1 '^REPO='
+
+# 2) /releases/latest 能解析到具体 tag
+curl -sI https://github.com/tools-lfre/Open-Box/releases/latest | grep -i '^location:'
+
+# 3) 安装包与校验文件可下载，且 SHA256 一致（x64 示例；arm64 把 x64 换成 arm64）
+cd /tmp
+curl -fsSLO https://github.com/tools-lfre/Open-Box/releases/latest/download/open-box-linux-x64.tar.gz
+curl -fsSLO https://github.com/tools-lfre/Open-Box/releases/latest/download/open-box-linux-x64.tar.gz.sha256
+sha256sum -c open-box-linux-x64.tar.gz.sha256
+
+# 4) 安装后检查服务与面板
+open-box password                          # 查看面板密码
+/etc/init.d/open-box status                # OpenWrt
+systemctl status openbox openbox-panel    # Debian / Ubuntu
+```
+
+`sha256sum -c` 输出 `open-box-linux-x64.tar.gz: OK` 即表示镜像资产完整；浏览器能打开 `http://<设备 LAN IP>:3036` 并进入首次密码设置页，即为安装成功。
+
 **支持的平台**
 
 路由器端（同一份安装包、同一条安装命令，脚本自己识别系统），见[路由器端](#路由器端)：
@@ -122,7 +195,7 @@ Open-Box 分两部分：**路由器端**装在路由器 / 主机上，是一体�
 
 ### 下载
 
-请从 [GitHub Releases](https://github.com/liandu2024/Open-Box/releases/latest) 下载对应架构的完整安装包：
+请从 [GitHub Releases](https://github.com/tools-lfre/Open-Box/releases/latest) 下载对应架构的完整安装包：
 
 - `x64`：x86_64 路由器 / 主机
 - `arm64`：aarch64 路由器 / 主机
@@ -140,13 +213,13 @@ Open-Box 分两部分：**路由器端**装在路由器 / 主机上，是一体�
 SSH 以 root 登录 OpenWrt 路由器后执行：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/install.sh | sh
 ```
 
 GitHub 访问不畅时，需要先通过可访问的 raw 镜像获取安装脚本，再让脚本使用镜像下载发布包：
 
 ```sh
-curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/install.sh | sh -s -- --mirror
+curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/install.sh | sh -s -- --mirror
 ```
 
 `--mirror` 只控制安装包下载；如果最外层的 `raw.githubusercontent.com` 本身无法访问，直接在原地址后追加 `--mirror` 仍然无法取得脚本。
@@ -214,7 +287,7 @@ Open-Box v0.1.216
 面板中可以从“设置 → 后端设置”检查更新，也可以通过 SSH 执行（OpenWrt 与 Debian / Ubuntu 同一条命令）：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/update.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/update.sh | sh
 ```
 
 升级会保留订阅、规则和面板密码，并校验 Open-Box、sing-box、GeoSite / GeoIP 组件。相同且完整的组件直接复用，只有变化、缺失或损坏的组件才会从本仓库 Release 下载。
@@ -224,13 +297,13 @@ curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/up
 如果升级后面板或内核异常,可以用下面的命令回退:脚本会到 GitHub 查当前版本之前最近的正式 Release,重新下载那一版的完整安装包装回去。路由器本机不保留旧版备份,所以回退需要能访问 GitHub(或镜像);订阅、规则、面板密码等数据目录不会被动。
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/update.sh | sh -s -- --rollback --direct
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/update.sh | sh -s -- --rollback --direct
 ```
 
 GitHub 访问不畅时，使用代理执行：
 
 ```sh
-curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/update.sh | sh -s -- --rollback --mirror https://gh-proxy.com
+curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/update.sh | sh -s -- --rollback --mirror https://gh-proxy.com
 ```
 
 两条命令都会自动识别路由器架构,下载上一个版本的完整安装包,先校验 SHA256,再替换当前文件;校验或替换失败会保留现有安装。--mirror 只影响安装包下载,查询 Release 列表的 GitHub API 会先直连、直连不通再经镜像。
@@ -240,13 +313,13 @@ curl -fsSL https://gh-proxy.com/raw.githubusercontent.com/liandu2024/Open-Box/ma
 默认停止服务并保留订阅和配置数据：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/uninstall.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/uninstall.sh | sh
 ```
 
 连数据一起删除：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/uninstall.sh | sh -s -- --purge
+curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/uninstall.sh | sh -s -- --purge
 ```
 
 ## 客户端
@@ -260,7 +333,7 @@ Open-Box App 把家里路由器端的分流规则带到手机、电脑上：在�
 - **和路由器一样的分流**：选了直连的流量不进内核；「连接」页能看每条连接走哪条线路、看内核日志，「路由」页签输入网址就能看它按哪条规则走（规则路由）、实际访问时怎么走（真实路由）。
 - **其他**：连上指定的 Wi-Fi（比如到家后）自动暂停 VPN、IPv6 开关、简体 / 繁體 / English、亮色 / 深色主题。
 
-安装包都在 [Releases](https://github.com/liandu2024/Open-Box/releases)：`open-box-android-<版本>.apk`、`open-box-macos-<版本>-arm64.dmg`、`open-box-windows-<版本>-x64-setup.exe`、`open-box-desktop-linux-<版本>-amd64.deb`，也可以在面板「设置 → 客户端」最上面的「客户端下载」里直接点。客户端只在有更新时随版本发布；最新版没带的话，它的版本说明末尾「客户端下载」一节有最新安装包的链接，也可以在 Releases 列表里往前找。
+安装包都在 [Releases](https://github.com/tools-lfre/Open-Box/releases)：`open-box-android-<版本>.apk`、`open-box-macos-<版本>-arm64.dmg`、`open-box-windows-<版本>-x64-setup.exe`、`open-box-desktop-linux-<版本>-amd64.deb`，也可以在面板「设置 → 客户端」最上面的「客户端下载」里直接点。客户端只在有更新时随版本发布；最新版没带的话，它的版本说明末尾「客户端下载」一节有最新安装包的链接，也可以在 Releases 列表里往前找。
 
 客户端「设置 → 配置」中，检测到配对失效或配对码已更换时，配置名称右侧会显示红色「！」。点击可查看原因并同步，输入正确的新配对码、同步成功后警告自动消失；本地分流和节点分流都支持。
 
@@ -269,7 +342,7 @@ Open-Box App 把家里路由器端的分流规则带到手机、电脑上：在�
 ### Android 客户端
 
 - **系统要求**：Android 12 及以上、64 位 ARM。
-- **安装与升级**：从 [Releases](https://github.com/liandu2024/Open-Box/releases) 下载最新的 `open-box-android-<版本>.apk`（或在面板「设置 → 客户端」的「客户端下载」里点 Android 图标），第一次手动安装（系统会提示允许安装来自浏览器 / 文件管理器的应用）；以后在 App「设置 → 检查更新」里一键升级。
+- **安装与升级**：从 [Releases](https://github.com/tools-lfre/Open-Box/releases) 下载最新的 `open-box-android-<版本>.apk`（或在面板「设置 → 客户端」的「客户端下载」里点 Android 图标），第一次手动安装（系统会提示允许安装来自浏览器 / 文件管理器的应用）；以后在 App「设置 → 检查更新」里一键升级。
 
 首页（节点分流）、代理 · 策略（本地分流）、连接 · 路由、设置：
 
@@ -287,7 +360,7 @@ Open-Box App 把家里路由器端的分流规则带到手机、电脑上：在�
 App 常驻菜单栏，退出 App 就断开 VPN；设置里有开机自启开关（默认关）。
 
 - **系统要求**：Apple 芯片（M1 及以后）的 Mac，macOS 14 及以上。
-- **安装**：从 [Releases](https://github.com/liandu2024/Open-Box/releases) 下载最新的 `open-box-macos-<版本>-arm64.dmg`（或在面板「设置 → 客户端」的「客户端下载」里点 macOS 图标），打开后把 Open-Box 拖进「应用程序」。App 没有 Apple 开发者签名，第一次打开会提示无法验证：到「系统设置 → 隐私与安全性」最下面点「仍要打开」（macOS 15 起右键「打开」已经绕不过去）。第一次打开还会请你输一次电脑密码，装一个后台服务（建立 VPN、修改系统 DNS 用，断开后自动还原）。
+- **安装**：从 [Releases](https://github.com/tools-lfre/Open-Box/releases) 下载最新的 `open-box-macos-<版本>-arm64.dmg`（或在面板「设置 → 客户端」的「客户端下载」里点 macOS 图标），打开后把 Open-Box 拖进「应用程序」。App 没有 Apple 开发者签名，第一次打开会提示无法验证：到「系统设置 → 隐私与安全性」最下面点「仍要打开」（macOS 15 起右键「打开」已经绕不过去）。第一次打开还会请你输一次电脑密码，装一个后台服务（建立 VPN、修改系统 DNS 用，断开后自动还原）。
 - **升级**：在 App「设置 → 检查更新」里一键升级，不用再点「仍要打开」；后台服务有变化时会再请你输一次电脑密码。
 - **卸载**：App「设置 → 卸载 Open-Box」。
 - 「连接指定 Wi-Fi 暂停」要允许 App 使用位置信息（macOS 只把 Wi-Fi 名称给有定位权限的 App）。
@@ -308,7 +381,7 @@ App 常驻菜单栏，退出 App 就断开 VPN；设置里有开机自启开关�
 App 常驻任务栏右下角：关掉窗口还在后台，左键点图标打开窗口，右键菜单里可以连接 / 断开、退出；退出 App 就断开 VPN。设置里有开机自启开关（默认关）。
 
 - **系统要求**：Windows 10 / 11，64 位。
-- **安装**：从 [Releases](https://github.com/liandu2024/Open-Box/releases) 下载最新的 `open-box-windows-<版本>-x64-setup.exe`（或在面板「设置 → 客户端」的「客户端下载」里点 Windows 图标），双击安装。安装包没有代码签名，运行时会提示「Windows 已保护你的电脑」：点「更多信息 → 仍要运行」，再在用户账户控制里点「是」。安装时会装一个后台服务（建立 VPN 用）。
+- **安装**：从 [Releases](https://github.com/tools-lfre/Open-Box/releases) 下载最新的 `open-box-windows-<版本>-x64-setup.exe`（或在面板「设置 → 客户端」的「客户端下载」里点 Windows 图标），双击安装。安装包没有代码签名，运行时会提示「Windows 已保护你的电脑」：点「更多信息 → 仍要运行」，再在用户账户控制里点「是」。安装时会装一个后台服务（建立 VPN 用）。
 - **升级**：在 App「设置 → 检查更新」里一键升级：用户账户控制里点一次「是」，装好后 App 自动重新打开。
 - **卸载**：App「设置 → 卸载 Open-Box」，或在 Windows「设置 → 应用 → 已安装的应用」里卸载 Open-Box。
 - 「连接指定 Wi-Fi 暂停」在 Windows 11 24H2 及以后要在「设置 → 隐私和安全性 → 位置」里打开定位服务、允许桌面应用访问位置（Windows 只把 Wi-Fi 名称给有定位权限的应用）。
@@ -329,7 +402,7 @@ App 常驻任务栏右下角：关掉窗口还在后台，左键点图标打开�
 关掉窗口 App 还在后台，顶栏托盘图标的菜单里可以打开窗口、连接 / 断开、退出；退出 App 就断开 VPN。设置里有开机自启开关（默认关）。
 
 - **系统要求**：Ubuntu 22.04 / 24.04、Debian 12，64 位 x86（amd64），GNOME 或 KDE 桌面。GNOME 要有 AppIndicator 扩展才显示托盘图标（Ubuntu 自带；Debian 要装 `gnome-shell-extension-appindicator`），没有托盘时从应用列表再打开 Open-Box 就回到窗口。
-- **安装**：从 [Releases](https://github.com/liandu2024/Open-Box/releases) 下载最新的 `open-box-desktop-linux-<版本>-amd64.deb`（或在面板「设置 → 客户端」的「客户端下载」里点 Linux 图标），在下载目录里运行 `sudo apt install ./open-box-desktop-linux-<版本>-amd64.deb`，装好后在应用列表里打开 Open-Box。安装时会装一个后台服务（建立 VPN、接管系统 DNS 用，断开后自动还原）。
+- **安装**：从 [Releases](https://github.com/tools-lfre/Open-Box/releases) 下载最新的 `open-box-desktop-linux-<版本>-amd64.deb`（或在面板「设置 → 客户端」的「客户端下载」里点 Linux 图标），在下载目录里运行 `sudo apt install ./open-box-desktop-linux-<版本>-amd64.deb`，装好后在应用列表里打开 Open-Box。安装时会装一个后台服务（建立 VPN、接管系统 DNS 用，断开后自动还原）。
 - **升级**：在 App「设置 → 检查更新」里一键升级，不用输密码，装好后 App 自动重新打开。
 - **卸载**：App「设置 → 卸载 Open-Box」，或运行 `sudo apt purge open-box-desktop`。
 - 同一台电脑上装着路由器端 Open-Box（Debian / Ubuntu 版）、而且它的内核在跑时，App 不会连接，要先在它的面板里停止内核。

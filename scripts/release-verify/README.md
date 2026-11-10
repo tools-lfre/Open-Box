@@ -190,8 +190,8 @@ OPENBOX_VERSION=v0.1.266 ... sh scripts/build-release.sh arm64 <产物目录>
 等镜像缓存跟上之后:
 
 ```sh
-curl -fsSL https://github.com/liandu2024/Open-Box/releases/latest/download/update.sh -o /tmp/openbox-release-update.sh
-curl -fsSL https://github.com/liandu2024/Open-Box/releases/latest/download/update.sh.sha256 -o /tmp/openbox-release-update.sh.sha256
+curl -fsSL https://github.com/tools-lfre/Open-Box/releases/latest/download/update.sh -o /tmp/openbox-release-update.sh
+curl -fsSL https://github.com/tools-lfre/Open-Box/releases/latest/download/update.sh.sha256 -o /tmp/openbox-release-update.sh.sha256
 sh -n /tmp/openbox-release-update.sh
 sh scripts/release-verify/run-host.sh openbox-dev install MIRROR=https://ghfast.top TAG=v0.1.266
 sh scripts/release-verify/run-host.sh ubuntu23 install MIRROR=https://ghfast.top TAG=v0.1.266

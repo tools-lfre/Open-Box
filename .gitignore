@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Local build / runtime artifacts
+node_modules/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.venv/
+*.log
+*.tmp
+*.part
+
+# Local credentials
+.env
+.env.local
+*.pem
+*.key
+
+# Release assets are mirrored on the GitHub Releases page, never committed to git
+/assets/

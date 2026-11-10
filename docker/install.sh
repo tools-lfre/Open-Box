@@ -116,16 +116,20 @@ if [ -z "$IMAGE" ] && [ -z "$ARCHIVE" ]; then
  command -v curl >/dev/null 2>&1 || die '在线下载需要 curl。'
  TEMP=$(mktemp -d)
  if [ "$VERSION" = latest ]; then
-  fetch 'https://api.github.com/repos/liandu2024/Open-Box/releases/latest' "$TEMP/release.json"
+  fetch 'https://api.github.com/repos/tools-lfre/Open-Box/releases/latest' "$TEMP/release.json"
   VERSION=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$TEMP/release.json" | head -n 1)
  fi
  printf '%s\n' "$VERSION" | awk '/^v[0-9]+\.[0-9]+\.[0-9]+([.-][a-zA-Z0-9.-]+)?$/ {ok=1} END{exit !ok}' || die 'Release 版本号无效。'
  IMAGE="open-box:${VERSION#v}"
  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  file="open-box-$VERSION-docker-linux-$ARCH.tar.gz"
+  file="open-box-docker-${VERSION#v}-linux-$ARCH.tar.gz"
   printf '下载并校验 %s 镜像…\n' "$ARCH"
-  fetch "https://github.com/liandu2024/Open-Box/releases/download/$VERSION/$file" "$TEMP/$file"
-  fetch "https://github.com/liandu2024/Open-Box/releases/download/$VERSION/$file.sha256" "$TEMP/$file.sha256"
+  if ! fetch "https://github.com/tools-lfre/Open-Box/releases/download/$VERSION/$file" "$TEMP/$file"; then
+   # v0.1.346 及更早的 Release 使用旧命名，保留兼容
+   file="open-box-$VERSION-docker-linux-$ARCH.tar.gz"
+   fetch "https://github.com/tools-lfre/Open-Box/releases/download/$VERSION/$file" "$TEMP/$file" || die '下载镜像包失败。'
+  fi
+  fetch "https://github.com/tools-lfre/Open-Box/releases/download/$VERSION/$file.sha256" "$TEMP/$file.sha256"
   ARCHIVE="$TEMP/$file"
  fi
 fi
