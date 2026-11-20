@@ -1,5 +1,10 @@
 #!/bin/sh
 # Open-Box 一键安装脚本(POSIX sh,兼容 OpenWrt ash 与 Debian dash;不使用 bash 专有语法)。
+# 【本地定制】基于上游 v0.1.467 修改:硬件(存储/内存)低于建议值时不再拒绝安装,
+#   改为"醒目提醒 + 倒计时后自动继续";只保留"读不到数值"这类真正的环境错误为致命错误。
+#   倒计时秒数可用环境变量 OPENBOX_HW_WARN_WAIT 覆盖(设为 0 表示只提醒不等待)。
+#   注意:上游更新后本补丁需重新应用。检查点:check_storage()/check_memory() 内
+#   应调用 warn_blocking 而不是 die。
 # 支持 OpenWrt 路由器,以及 Debian / Ubuntu(systemd;见下方 detect_platform 的说明)。
 #
 # 用法:
@@ -26,20 +31,18 @@ set -eu
 # uhttpd / rpcd 读到,LuCI 的 status.js 曾因此变成 600 而 403(GitHub #103 #106 #110)
 umask 022
 
-REPO="tools-lfre/Open-Box"
+REPO="liandu2024/Open-Box"
 INSTALL_ROOT="/opt/open-box"
-# OpenWrt 的 /tmp 通常是 tmpfs，会把下载包直接计入运行内存。完整安装包约
-# 106MB，低内存路由器在面板/内核已经运行时下载它可能触发 OOM，表现为“死机”。
+# OpenWrt 的 /tmp 通常是 tmpfs，会把下载包直接计入运行内存。
 # 下载临时目录默认放在 /opt 所在的持久化文件系统；需要时可用 OPENBOX_TMPDIR
 # 明确指定其它可写目录（例如外接存储）。校验通过前仍不会写入安装目录本身。
 # TMP_PARENT 在下面用 openbox_pick_tmp_parent 现挑(见那一段的说明),这里先留空
 TMP_PARENT=""
-MIN_FREE_KB=$((512 * 1024))
-# 450000KB(≈440MB)而不是标称的 512*1024:512MB 设备的 /proc/meminfo MemTotal 实测
-# 只有约 480-500MB(内核保留了一部分),用 524288 卡阈值会把 README 宣称支持的
-# 最低配机器自己拒之门外。README 的"≥512MB 内存"说的是标称容量,不是这里的检测
-# 阈值,两者故意不一致(P6 终审 Important 2)。
-MIN_MEM_KB=450000
+MIN_FREE_KB=$((256 * 1024))
+# 210000KB(≈205MB)而不是标称的 256*1024:256MB 设备的 /proc/meminfo MemTotal 实测
+# 只有约 220-248MB(内核保留了一部分),用 262144 卡阈值会把 README 宣称支持的
+# 最低配机器自己拒之门外。README 的"≥256MB 内存"说的是标称容量,不是这里的检测阈值。
+MIN_MEM_KB=210000
 
 CHANNEL="direct"
 MIRROR_PREFIX=""
@@ -189,6 +192,35 @@ die() {
   drain_stdin
   exit 1
 }
+
+# ---- 硬件限制降级补丁:start ----
+# 打印带边框的醒目提醒块(检测值 / 建议值 / 风险 / 回退方式),倒计时结束后自动继续。
+# 不读任何输入:常规用法是 `curl ... | sh`,此时 stdin 是管道而非终端,任何
+# "请输入 y 继续"的设计都会立刻读到 EOF 而失败,与"取消限制、让用户装得上"的目的相反。
+# 倒计时期间按 Ctrl-C 仍可中止;秒数可用环境变量 OPENBOX_HW_WARN_WAIT 覆盖,0 表示只提醒不等待。
+warn_blocking() {
+  _wb_title="$1"; _wb_got="$2"; _wb_want="$3"; _wb_risk="$4"
+  _wb_wait=${OPENBOX_HW_WARN_WAIT:-5}
+  echo "" >&2
+  echo "========================================================" >&2
+  echo "[open-box] 注意:$1" >&2
+  echo "  检测值:$2" >&2
+  echo "  建议值:$3" >&2
+  echo "  风险:$4" >&2
+  echo "  继续安装后若想回退,可运行卸载脚本:" >&2
+  echo "    curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/uninstall.sh | sh -s -- --purge" >&2
+  if [ "$_wb_wait" -gt 0 ] 2>/dev/null; then
+    echo "  ${_wb_wait} 秒后自动继续安装,按 Ctrl-C 可中止。" >&2
+    _wb_i=0
+    while [ "$_wb_i" -lt "$_wb_wait" ]; do
+      _wb_i=$((_wb_i + 1))
+      sleep 1
+    done
+  fi
+  echo "========================================================" >&2
+  return 0
+}
+# ---- 硬件限制降级补丁:end ----
 
 usage() {
   cat <<'EOF'
@@ -374,7 +406,11 @@ check_storage() {
     ''|*[!0-9]*) die "无法检测可用存储空间(df 命令输出异常)。" ;;
   esac
   if [ "$kb" -lt "$MIN_FREE_KB" ]; then
-    die "可用存储不足:检测到约 $((kb / 1024))MB,Open-Box 至少需要 512MB 可用空间。请清理存储后重试。"
+    # 【本地定制】低于建议值不再 die 拒绝安装,降级为醒目提醒后继续
+    warn_blocking "可用存储低于建议值" \
+      "约 $((kb / 1024))MB 可用" \
+      "建议至少 $((MIN_FREE_KB / 1024))MB 可用空间" \
+      "安装包约百余 MB,空间不足时下载/解包可能中途失败(curl 报错 23 常见于此);失败不会破坏现有数据。"
   fi
 }
 
@@ -385,7 +421,11 @@ check_memory() {
     ''|*[!0-9]*) die "无法解析 /proc/meminfo 中的内存信息。" ;;
   esac
   if [ "$mem_kb" -lt "$MIN_MEM_KB" ]; then
-    die "内存不足:检测到约 $((mem_kb / 1024))MB,Open-Box 至少需要 512MB 内存。"
+    # 【本地定制】低于建议值不再 die 拒绝安装,降级为醒目提醒后继续
+    warn_blocking "内存低于建议值" \
+      "约 $((mem_kb / 1024))MB" \
+      "建议标称内存至少 256MB" \
+      "内存偏小时面板/内核可能运行缓慢或被内核 OOM 杀掉;装完后如不稳定可卸载回退。"
   fi
 }
 
@@ -414,7 +454,7 @@ check_existing_install() {
     fi
     # 光说"请使用 update.sh"没用:用户照着敲 update.sh 只会得到 not found(真机反馈)。给完整命令。
     die "$INSTALL_ROOT 已存在且包含完整安装。如需升级,请复制下面这条命令运行:
-       curl -fsSL https://raw.githubusercontent.com/tools-lfre/Open-Box/main/scripts/update.sh | sh -s -- --mirror
+       curl -fsSL https://raw.githubusercontent.com/liandu2024/Open-Box/main/scripts/update.sh | sh -s -- --mirror
      (也可以在面板或 LuCI → 服务 → Open-Box 页面里点升级。)"
   fi
   info "检测到保留的 $INSTALL_ROOT/data(此前卸载时选择了保留数据),安装将复用它。"
@@ -465,7 +505,6 @@ ENV_REPORT_ON=1
 info "开始预检..."
 check_root
 detect_platform
-[ "$PLATFORM" = "systemd" ] || ! openbox_musl_too_old || die "$(openbox_old_firmware_message)"
 map_arch
 check_storage
 check_memory
@@ -532,9 +571,8 @@ dep_ok() {
     kmod-veth) [ -d "$DEP_SYS_MODULE/veth" ] || modprobe veth >/dev/null 2>&1 ;;
     ip-full) ip netns list >/dev/null 2>&1 ;;
     ca-bundle) [ -s "$DEP_CA_BUNDLE" ] ;;
-    # 下面两个只在 Debian / Ubuntu 上检查:nft 命令装 Open-Box 自己的表,xz 解 nodejs.org 的 Node 包
+    # 下面这项只在 Debian / Ubuntu 上检查:nft 命令装 Open-Box 自己的表
     nftables) command -v nft >/dev/null 2>&1 ;;
-    xz-utils) command -v xz >/dev/null 2>&1 ;;
     *) return 0 ;;
   esac
 }
@@ -560,7 +598,6 @@ dep_effect() {
     kmod-veth|ip-full) echo "规则页不能模拟 LAN 终端(可改用内核诊断)" ;;
     ca-bundle) echo "HTTPS 订阅和更新下载会因证书校验失败" ;;
     nftables) echo "起内核前装不上 Open-Box 自己的 nft 表(进内核前放行 / 直连应答放行不生效)" ;;
-    xz-utils) echo "解不开 nodejs.org 的 Node 压缩包,面板跑不起来" ;;
   esac
 }
 # 各包管理器的软件源配置在哪(提示用)
@@ -578,7 +615,7 @@ ensure_dependencies() {
     return 0
   fi
   _dep_all="kmod-tun kmod-nft-queue kmod-nft-nat kmod-veth ip-full ca-bundle"
-  [ "${PLATFORM:-openwrt}" = "systemd" ] && _dep_all="$_dep_all nftables xz-utils"
+  [ "${PLATFORM:-openwrt}" = "systemd" ] && _dep_all="$_dep_all nftables"
   _dep_missing=""
   for _d in $_dep_all; do dep_ok "$_d" || _dep_missing="$_dep_missing $_d"; done
   if [ -z "$_dep_missing" ]; then
@@ -684,7 +721,7 @@ fetch_to_file() {
 }
 
 # 镜像通道把整条 URL(含协议头)拼在前缀后面,例如:
-#   https://<前缀>/https://github.com/tools-lfre/Open-Box/releases/...
+#   https://<前缀>/https://github.com/liandu2024/Open-Box/releases/...
 # 这与设计文档给出的 raw.githubusercontent 加速示例是同一种拼法,直连/api/release 三类
 # URL 统一走这条规则,方便镜像服务按同一套反代规则处理。
 build_url() {
@@ -1152,25 +1189,46 @@ openbox_node_smoke() {
 }
 # ---- openbox-node-smoke:end ----
 
-# 校验、解包都已完成,此时读取的版本号就是实际装上的版本号(见上面 Important 5 的
-# 说明:不再从 GitHub API 的 tag_name 提前拿版本号)。
+# ---- openbox-panel-smoke:start ----
+# 这一段在 install.sh / update.sh 两份里一模一样:
+# 纯静态 Go 面板(bin/openbox-panel)直接执行 version 冒烟;兼容老版 Node 安装包(无 bin/openbox-panel 但有 node/bin/node)时走 Node 冒烟。
+openbox_panel_smoke() {
+  _ob_root="${1:-$INSTALL_ROOT}"
+  if [ -x "$_ob_root/bin/openbox-panel" ]; then
+    _ob_out=$("$_ob_root/bin/openbox-panel" version 2>&1) || {
+      echo "$_ob_out" | head -n 5
+      return 1
+    }
+    case "$_ob_out" in
+      "openbox-panel "*) return 0 ;;
+    esac
+    echo "$_ob_out" | head -n 5
+    return 1
+  fi
+  openbox_node_smoke "$_ob_root"
+}
+# ---- openbox-panel-smoke:end ----
+
+# 校验、解包都已完成,此时读取的版本号就是实际装上的版本号
 VERSION=$(sed -n 's/.*"version" *: *"\([^"]*\)".*/\1/p' "$INSTALL_ROOT/meta.json" 2>/dev/null | head -n 1)
 [ -n "$VERSION" ] || VERSION="未知版本"
 
-if [ "$PLATFORM" = "systemd" ]; then
-  info "Debian / Ubuntu:下载 glibc 版 Node 运行时(发布包里的是 OpenWrt 用的 musl 版)..."
+if [ ! -x "$INSTALL_ROOT/bin/openbox-panel" ] && [ -d "$INSTALL_ROOT/node" ] && [ "$PLATFORM" = "systemd" ]; then
+  info "Debian / Ubuntu:下载 glibc 版 Node 运行时(旧版发布包)..."
   if ! _gn_err=$(openbox_glibc_node "$INSTALL_ROOT"); then
     [ -n "$_gn_err" ] && printf '%s\n' "$_gn_err" >&2
     die "glibc 版 Node 没装上,面板跑不起来,安装中止。请检查能否访问 nodejs.org 或 npmmirror.com 后重新运行安装脚本。"
   fi
 fi
 
-info "检查随包 Node 能否运行..."
-if ! _ob_node_err=$(openbox_node_smoke); then
-  warn "随包的 Node 在这台设备上起不来:"
-  [ -n "$_ob_node_err" ] && printf '%s\n' "$_ob_node_err" >&2
-  case "$_ob_node_err" in *"symbol not found"*) die "$(openbox_old_firmware_message)" ;; esac
-  openbox_musl_too_old && die "$(openbox_old_firmware_message)"
+info "检查面板程序能否运行..."
+if ! _ob_panel_err=$(openbox_panel_smoke "$INSTALL_ROOT"); then
+  warn "随包的面板程序在这台设备上起不来:"
+  [ -n "$_ob_panel_err" ] && printf '%s\n' "$_ob_panel_err" >&2
+  if [ ! -x "$INSTALL_ROOT/bin/openbox-panel" ]; then
+    case "$_ob_panel_err" in *"symbol not found"*) die "$(openbox_old_firmware_message)" ;; esac
+    openbox_musl_too_old && die "$(openbox_old_firmware_message)"
+  fi
   die "面板跑不起来,安装中止。请把上面几行连同 \`uname -a\`、\`cat /etc/openwrt_release\`、\`head -3 /proc/meminfo\` 一起发到 GitHub issue。"
 fi
 
